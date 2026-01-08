@@ -1,4 +1,4 @@
-Name: Development build
+name: Development build
 
 on:
   pull_request:
