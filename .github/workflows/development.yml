@@ -92,13 +92,6 @@ jobs:
           cmake --build build --config RelWithDebInfo --target GL
           cp -R lib/libGL.dylib ../Natives/resources/Frameworks/libgl4es_114.dylib
 
-      - name: Debug Makefile Content
-        run: |
-          echo "================ LENDO MAKEFILE (Linhas 170 a 200) ================"
-          # O comando 'cat -n' numera as linhas para sabermos exatemente onde estamos
-          cat -n Makefile | sed -n '170,200p'
-          echo "==================================================================="
-
       - name: Build for ${{ matrix.platform_name }}
         run: |
           # 1. Carrega o Homebrew
