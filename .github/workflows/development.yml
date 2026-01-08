@@ -94,27 +94,38 @@ jobs:
 
       - name: Build for ${{ matrix.platform_name }}
         run: |
-          # Adiciona o Homebrew ao PATH dinamicamente (funciona em Intel e Apple Silicon)
+          # 1. Carrega o Homebrew
           eval "$(/opt/homebrew/bin/brew shellenv)"
           
+          # 2. --- CORREÇÃO CRÍTICA DO JAVA ---
+          # Recupera o JAVA_HOME definido pelo setup-java e coloca no topo do PATH
+          export JAVA_HOME=${JAVA_HOME}
+          export PATH=$JAVA_HOME/bin:$PATH
+          
+          # Debug: Mostra qual Java está sendo detectado agora (deve aparecer 1.8)
+          echo "Verificando versão do Java:"
+          java -version
+          echo "JAVA_HOME atual: $JAVA_HOME"
+          # -----------------------------------
+
           export SLIMMED=1
           
-          # Define o comando make correto. Se gmake não existir, usa make.
+          # Define o comando make (gmake ou make)
           MAKE_CMD="make"
           if command -v gmake &> /dev/null; then
               MAKE_CMD="gmake"
           fi
           
-          echo "Using make command: $MAKE_CMD"
-
+          # 3. Executa o build passando o JAVA_HOME explicitamente como argumento
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
-            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
-            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
-            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           else
-            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
           fi
+
       - name: Upload regular ipa
         uses: actions/upload-artifact@main
         with:
