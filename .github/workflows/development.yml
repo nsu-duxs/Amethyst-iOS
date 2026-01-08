@@ -1,4 +1,4 @@
-name: Development build
+Name: Development build
 
 on:
   pull_request:
@@ -27,40 +27,27 @@ jobs:
           rm -rf ./.??* || true
           
       - name: Checkout repository
-        uses: actions/checkout@v4 # Atualizado para v4 (recomendado)
+        uses: actions/checkout@v4
 
       - name: Checkout repository submodules
         run: git submodule update --init --recursive
 
-      # Adicionado: Instala dependências essenciais que faltam no macos-latest
       - name: Install Dependencies
         run: |
           brew update
-          brew install make ldid
-          # Adiciona o make do homebrew ao PATH como gmake se necessário, ou apenas garante que está lá
-          echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
-      # ... (Passos anteriores: Checkout, Install Dependencies...)
-
-      - name: Install Dependencies
-        run: |
-          brew update
-          brew install make ldid
+          # Adicionei wget e cmake para garantir
+          brew install make ldid wget cmake
           echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
 
-      # --- ADICIONE ISTO AQUI ---
       - name: Setup Java 8
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu' # 'temurin' é o padrão atual (antigo AdoptOpenJDK)
+          distribution: 'zulu' # Zulu é essencial para Mac M1/ARM64
           java-version: '8'
-      # --------------------------
 
-      # ... (Continua com o gl4es e o Build...)
-
-      # ... (Mantive as etapas do gl4es que você já tinha, mesmo com if: false) ...
       - name: Get gl4es latest commit hash
         id: gl4es-sha
-        run: echo "sha=$(git ls-remote https://github.com/PojavLauncherTeam/gl4es-114-extra refs/heads/master | grep -io '^\S*')" >> $GITHUB_OUTPUT # Sintaxe atualizada de set-output
+        run: echo "sha=$(git ls-remote https://github.com/PojavLauncherTeam/gl4es-114-extra refs/heads/master | grep -io '^\S*')" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache gl4es
@@ -85,22 +72,29 @@ jobs:
           cd gl4es
           git config user.email "github-actions@users.noreply.github.com"
           git config user.name "github-actions"
-          # Removido export PATH fixo, usando ambiente padrão
           cmake -B build -DDEFAULT_ES=2 \
             -DNOX11=ON -DNOEGL=OFF -DSTATICLIB=OFF -DPLATFORM=OS64 \
             -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration
           cmake --build build --config RelWithDebInfo --target GL
           cp -R lib/libGL.dylib ../Natives/resources/Frameworks/libgl4es_114.dylib
 
-      # 1. TRAZEMOS DE VOLTA O PATCH (Ignora os erros das linhas 184 e 189)
+      # --- CORREÇÕES CRÍTICAS COMEÇAM AQUI ---
+
+      # 1. Ignora os erros de verificação do Java no Makefile
       - name: Patch Makefile (Bypass Java Checks)
         run: |
-          echo "Patcheando verificações de JDK..."
-          # Transforma erros fatais em avisos (warnings)
           sed -i '' '184s/error/warning/' Makefile
           sed -i '' '189s/error/warning/' Makefile
 
-      # 2. BUILD COM O COMPILADOR CERTO (Java 8 Real)
+      # 2. INJETA O HEADER FALTANDO (Resolve o erro 'mach_task_self')
+      - name: Fix JavaLauncher Headers
+        run: |
+          echo "Adicionando headers faltando no JavaLauncher.m..."
+          # Insere #include <mach/mach.h> na primeira linha do arquivo
+          sed -i '' '1i\
+          #include <mach/mach.h>' Natives/JavaLauncher.m
+
+      # 3. Build Final
       - name: Build for ${{ matrix.platform_name }}
         run: |
           eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -109,16 +103,10 @@ jobs:
           export JAVA_HOME=${JAVA_HOME}
           export PATH=$JAVA_HOME/bin:$PATH
           export BOOTJDK=$JAVA_HOME
+          # Define o caminho EXATO do compilador Java 8 para evitar erro de módulos
           export JAVAC_CMD="$JAVA_HOME/bin/javac"
           
-          # --- A CORREÇÃO MÁGICA ---
-          # 1. Ignora erro de função não declarada (implicit-function-declaration)
-          # 2. Ignora erro de tipos inteiros em ponteiros (int-conversion)
-          export CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-conversion"
-          export OBJCFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-conversion"
-          # -------------------------
-
-          echo "Configurando ambiente de build..."
+          echo "Ambiente configurado."
           $JAVAC_CMD -version
           
           MAKE_CMD="make"
@@ -126,7 +114,7 @@ jobs:
               MAKE_CMD="gmake"
           fi
 
-          # Executa o build
+          # Executa o build com -j1 para segurança e clareza nos logs
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
             $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
@@ -135,35 +123,34 @@ jobs:
             $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           fi
 
-
-
+      # --- FIM DAS CORREÇÕES ---
 
       - name: Upload regular ipa
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v4
         with:
           name: org.angelauramc.amethyst-${{ matrix.platform_name }}.ipa
           path: artifacts/org.angelauramc.amethyst-*-${{ matrix.platform_name }}.ipa
 
       - name: Upload regular tipa
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v4
         with:
           name: org.angelauramc.amethyst-${{ matrix.platform_name }}-trollstore.tipa
           path: artifacts/org.angelauramc.amethyst-*-${{ matrix.platform_name }}-trollstore.tipa
 
       - name: Upload slimmed ipa
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v4
         with:
           name: org.angelauramc.amethyst.slimmed-${{ matrix.platform_name }}.ipa
           path: artifacts/org.angelauramc.amethyst.slimmed-*-${{ matrix.platform_name }}.ipa
 
       - name: Upload slimmed tipa
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v4
         with:
           name: org.angelauramc.amethyst.slimmed-${{ matrix.platform_name }}-trollstore.tipa
           path: artifacts/org.angelauramc.amethyst.slimmed-*-${{ matrix.platform_name }}-trollstore.tipa
 
       - name: Upload PojavLauncher.dSYM
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v4
         if: matrix.platform_name == 'ios'
         with:
           name: AngelAuraAmethyst.dSYM
