@@ -20,7 +20,7 @@ jobs:
             platform_name: ios
     
     runs-on: macos-latest
-        steps:
+    steps:
       - name: Remove work folders
         run: |
           rm -rf ./* || true
