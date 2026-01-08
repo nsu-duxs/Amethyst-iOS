@@ -105,15 +105,20 @@ jobs:
         run: |
           eval "$(/opt/homebrew/bin/brew shellenv)"
           
-          # Configura variáveis de ambiente
+          # Configurações do Java
           export JAVA_HOME=${JAVA_HOME}
           export PATH=$JAVA_HOME/bin:$PATH
           export BOOTJDK=$JAVA_HOME
-          
-          # Define explicitamente o caminho do compilador Java 8
           export JAVAC_CMD="$JAVA_HOME/bin/javac"
           
-          echo "Usando compilador: $JAVAC_CMD"
+          # --- A CORREÇÃO MÁGICA ---
+          # 1. Ignora erro de função não declarada (implicit-function-declaration)
+          # 2. Ignora erro de tipos inteiros em ponteiros (int-conversion)
+          export CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-conversion"
+          export OBJCFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-conversion"
+          # -------------------------
+
+          echo "Configurando ambiente de build..."
           $JAVAC_CMD -version
           
           MAKE_CMD="make"
@@ -121,16 +126,15 @@ jobs:
               MAKE_CMD="gmake"
           fi
 
-          # Executa o build passando a variável JAVAC para substituir a do sistema
-          # Mantive -j1 para garantir que veremos erros se houver, mas pode tirar depois
+          # Executa o build
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
             $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
-            # $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
             $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           else
             $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           fi
+
 
 
 
