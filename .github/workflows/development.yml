@@ -102,11 +102,17 @@ jobs:
           # Configurações do Java
           export JAVA_HOME=${JAVA_HOME}
           export PATH=$JAVA_HOME/bin:$PATH
-          export BOOTJDK=$JAVA_HOME
-          # Define o caminho EXATO do compilador Java 8 para evitar erro de módulos
+          
+          # --- CORREÇÃO AQUI ---
+          # O Makefile espera que o BOOTJDK aponte para a pasta BIN, não a raiz
+          export BOOTJDK="$JAVA_HOME/bin"
+          # ---------------------
+          
+          # Define o caminho EXATO do compilador Java 8
           export JAVAC_CMD="$JAVA_HOME/bin/javac"
           
           echo "Ambiente configurado."
+          echo "BOOTJDK está em: $BOOTJDK"
           $JAVAC_CMD -version
           
           MAKE_CMD="make"
@@ -114,14 +120,16 @@ jobs:
               MAKE_CMD="gmake"
           fi
 
-          # Executa o build com -j1 para segurança e clareza nos logs
+          # Executa o build
+          # Passamos BOOTJDK explicitamente para garantir que o Makefile pegue o caminho certo
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
-            $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
+            $MAKE_CMD BOOTJDK="$BOOTJDK" JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
-            $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            $MAKE_CMD BOOTJDK="$BOOTJDK" JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           else
-            $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
+            $MAKE_CMD BOOTJDK="$BOOTJDK" JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           fi
+
 
       # --- FIM DAS CORREÇÕES ---
 
