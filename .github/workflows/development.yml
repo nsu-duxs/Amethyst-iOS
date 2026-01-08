@@ -94,37 +94,33 @@ jobs:
 
       - name: Build for ${{ matrix.platform_name }}
         run: |
-          # 1. Carrega o Homebrew
           eval "$(/opt/homebrew/bin/brew shellenv)"
-          
-          # 2. --- CORREÇÃO CRÍTICA DO JAVA ---
-          # Recupera o JAVA_HOME definido pelo setup-java e coloca no topo do PATH
           export JAVA_HOME=${JAVA_HOME}
           export PATH=$JAVA_HOME/bin:$PATH
+          export BOOTJDK=$JAVA_HOME
           
-          # Debug: Mostra qual Java está sendo detectado agora (deve aparecer 1.8)
-          echo "Verificando versão do Java:"
-          java -version
-          echo "JAVA_HOME atual: $JAVA_HOME"
-          # -----------------------------------
-
-          export SLIMMED=1
+          # Define o caminho EXATO do compilador Java 8
+          export JAVAC_CMD="$JAVA_HOME/bin/javac"
           
-          # Define o comando make (gmake ou make)
+          echo "Verificando compilador:"
+          $JAVAC_CMD -version
+          
           MAKE_CMD="make"
           if command -v gmake &> /dev/null; then
               MAKE_CMD="gmake"
           fi
-          
-          # 3. Executa o build passando o JAVA_HOME explicitamente como argumento
+
+          echo "Iniciando build..."
+
+          # Passamos JAVAC="$JAVAC_CMD" para garantir que o Makefile use o compilador certo
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
-            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
-            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
-            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
           else
-            $MAKE_CMD JAVA_HOME="$JAVA_HOME" -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+            $MAKE_CMD JAVAC="$JAVAC_CMD" JAVA_HOME="$JAVA_HOME" -j1 dsym package PLATFORM=${{ matrix.platform }}
           fi
+
 
       - name: Upload regular ipa
         uses: actions/upload-artifact@main
