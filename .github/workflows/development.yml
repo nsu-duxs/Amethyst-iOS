@@ -92,11 +92,12 @@ jobs:
           cmake --build build --config RelWithDebInfo --target GL
           cp -R lib/libGL.dylib ../Natives/resources/Frameworks/libgl4es_114.dylib
 
-      - name: Patch Makefile (Ignore Java Check)
+      - name: Debug Makefile Content
         run: |
-          # Substitui o comando de erro fatal por um aviso simples no Makefile
-          # Isso ignora a verificação teimosa da linha 189
-          sed -i '' 's/$(error You need to install JDK 8.)/$(warning Skipping JDK 8 check, assuming correct environment.)/g' Makefile
+          echo "================ LENDO MAKEFILE (Linhas 170 a 200) ================"
+          # O comando 'cat -n' numera as linhas para sabermos exatemente onde estamos
+          cat -n Makefile | sed -n '170,200p'
+          echo "==================================================================="
 
       - name: Build for ${{ matrix.platform_name }}
         run: |
