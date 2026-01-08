@@ -39,6 +39,23 @@ jobs:
           brew install make ldid
           # Adiciona o make do homebrew ao PATH como gmake se necessário, ou apenas garante que está lá
           echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
+      # ... (Passos anteriores: Checkout, Install Dependencies...)
+
+      - name: Install Dependencies
+        run: |
+          brew update
+          brew install make ldid
+          echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
+
+      # --- ADICIONE ISTO AQUI ---
+      - name: Setup Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin' # 'temurin' é o padrão atual (antigo AdoptOpenJDK)
+          java-version: '8'
+      # --------------------------
+
+      # ... (Continua com o gl4es e o Build...)
 
       # ... (Mantive as etapas do gl4es que você já tinha, mesmo com if: false) ...
       - name: Get gl4es latest commit hash
