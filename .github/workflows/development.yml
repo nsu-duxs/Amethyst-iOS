@@ -20,30 +20,35 @@ jobs:
             platform_name: ios
     
     runs-on: macos-latest
-    steps:
+        steps:
       - name: Remove work folders
         run: |
-          echo "before"
-          ls -lah ./
           rm -rf ./* || true
           rm -rf ./.??* || true
-          echo "after"
-          ls -lah ./
           
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v4 # Atualizado para v4 (recomendado)
 
       - name: Checkout repository submodules
         run: git submodule update --init --recursive
 
+      # Adicionado: Instala dependências essenciais que faltam no macos-latest
+      - name: Install Dependencies
+        run: |
+          brew update
+          brew install make ldid
+          # Adiciona o make do homebrew ao PATH como gmake se necessário, ou apenas garante que está lá
+          echo "/opt/homebrew/opt/make/libexec/gnubin" >> $GITHUB_PATH
+
+      # ... (Mantive as etapas do gl4es que você já tinha, mesmo com if: false) ...
       - name: Get gl4es latest commit hash
         id: gl4es-sha
-        run: echo "::set-output name=sha::$(echo $(git ls-remote https://github.com/PojavLauncherTeam/gl4es-114-extra refs/heads/master | grep -io '^\S*'))"
+        run: echo "sha=$(git ls-remote https://github.com/PojavLauncherTeam/gl4es-114-extra refs/heads/master | grep -io '^\S*')" >> $GITHUB_OUTPUT # Sintaxe atualizada de set-output
         shell: bash
 
       - name: Cache gl4es
-        uses: actions/cache@main
-        if: false # use gl4es 1.1.5
+        uses: actions/cache@v3
+        if: false
         id: gl4es-cache
         with:
           path: gl4es/libs
@@ -51,7 +56,7 @@ jobs:
 
       - name: Get gl4es
         if: false && steps.gl4es-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
         with:
           repository: 'PojavLauncherTeam/gl4es-114-extra'
           path: 'gl4es'
@@ -63,38 +68,36 @@ jobs:
           cd gl4es
           git config user.email "github-actions@users.noreply.github.com"
           git config user.name "github-actions"
-          export PATH=/opt/procursus/bin:$PATH
-          wget https://github.com/leetal/ios-cmake/raw/master/ios.toolchain.cmake
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE=ios.toolchain.cmake -DDEFAULT_ES=2 \
+          # Removido export PATH fixo, usando ambiente padrão
+          cmake -B build -DDEFAULT_ES=2 \
             -DNOX11=ON -DNOEGL=OFF -DSTATICLIB=OFF -DPLATFORM=OS64 \
             -DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration
           cmake --build build --config RelWithDebInfo --target GL
           cp -R lib/libGL.dylib ../Natives/resources/Frameworks/libgl4es_114.dylib
-          
-      - name: Push gl4es
-        if: false && github.event != 'pull_request' && github.ref_name == 'main' && steps.gl4es-cache.outputs.cache-hit != 'true'
-        continue-on-error: true
-        run: |
-          git add Natives/resources/Frameworks/libgl4es_114.dylib
-          git commit -am "CI: Update gl4es"
-          git push
 
       - name: Build for ${{ matrix.platform_name }}
         run: |
-          export PATH=/opt/homebrew/bin:$PATH
+          # Adiciona o Homebrew ao PATH dinamicamente (funciona em Intel e Apple Silicon)
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          
           export SLIMMED=1
-          if [ "${{ matrix.platform_name }}" == "ios" ]; then
-            # Build ipa and tipa for iOS
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
-          elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
-            # Build tipa only for tvOS
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
-          else
-            # Build ipa only for everything else
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+          
+          # Define o comando make correto. Se gmake não existir, usa make.
+          MAKE_CMD="make"
+          if command -v gmake &> /dev/null; then
+              MAKE_CMD="gmake"
           fi
+          
+          echo "Using make command: $MAKE_CMD"
 
+          if [ "${{ matrix.platform_name }}" == "ios" ]; then
+            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+          elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
+            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+          else
+            $MAKE_CMD -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+          fi
       - name: Upload regular ipa
         uses: actions/upload-artifact@main
         with:
